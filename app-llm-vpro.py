@@ -10,7 +10,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -75,7 +75,38 @@ def main():
         st.sidebar.header("🔍 Filtros")
         data_min = df["Iniciada em"].min()
         data_max = df["Iniciada em"].max()
-        data_inicio, data_fim = st.sidebar.date_input("Período de vendas", [data_min, data_max], min_value=data_min, max_value=data_max)
+
+        periodo_opcao = st.sidebar.selectbox("Selecionar período:", ("Personalizado", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses"))
+
+        if periodo_opcao == "Hoje":
+            data_inicio = datetime.today()
+            data_fim = datetime.today()
+            comparativo_inicio = data_inicio - timedelta(days=1)
+            comparativo_fim = data_fim - timedelta(days=1)
+        elif periodo_opcao == "Ontem":
+            data_inicio = datetime.today() - timedelta(days=1)
+            data_fim = datetime.today() - timedelta(days=1)
+            comparativo_inicio = data_inicio - timedelta(days=1)
+            comparativo_fim = data_fim - timedelta(days=1)
+        elif periodo_opcao == "Últimos 7 dias":
+            data_fim = datetime.today()
+            data_inicio = data_fim - timedelta(days=6)
+            comparativo_fim = data_inicio - timedelta(days=1)
+            comparativo_inicio = comparativo_fim - timedelta(days=6)
+        elif periodo_opcao == "Últimos 30 dias":
+            data_fim = datetime.today()
+            data_inicio = data_fim - timedelta(days=29)
+            comparativo_fim = data_inicio - timedelta(days=1)
+            comparativo_inicio = comparativo_fim - timedelta(days=29)
+        elif periodo_opcao == "Últimos 12 meses":
+            data_fim = datetime.today()
+            data_inicio = data_fim - timedelta(days=365)
+            comparativo_fim = data_inicio - timedelta(days=1)
+            comparativo_inicio = comparativo_fim - timedelta(days=365)
+        else:
+            data_inicio, data_fim = st.sidebar.date_input("Período de vendas", [data_min, data_max], min_value=data_min, max_value=data_max)
+            comparativo_inicio = data_inicio
+            comparativo_fim = data_fim
 
         afiliado = st.sidebar.selectbox("Afiliado", ["Todos"] + sorted(df["Afiliado (Nome)"].dropna().unique().tolist()))
         cidade = st.sidebar.selectbox("Cidade", ["Todos"] + sorted(df["Cliente (Cidade)"].dropna().unique().tolist()))
@@ -148,16 +179,9 @@ def main():
             st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
 
         st.subheader("🔄 Comparativo entre Períodos")
-        col5, col6 = st.columns(2)
-        with col5:
-            periodo1 = st.date_input("Início Período 1", data_min)
-            fim1 = st.date_input("Fim Período 1", data_max)
-        with col6:
-            periodo2 = st.date_input("Início Período 2", data_min)
-            fim2 = st.date_input("Fim Período 2", data_max)
 
-        vendas_p1 = df_filtrado[(df_filtrado["Iniciada em"].dt.date >= periodo1) & (df_filtrado["Iniciada em"].dt.date <= fim1)]["Total"].sum()
-        vendas_p2 = df_filtrado[(df_filtrado["Iniciada em"].dt.date >= periodo2) & (df_filtrado["Iniciada em"].dt.date <= fim2)]["Total"].sum()
+        vendas_p1 = df[(df["Iniciada em"].dt.date >= comparativo_inicio) & (df["Iniciada em"].dt.date <= comparativo_fim)]["Total"].sum()
+        vendas_p2 = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]["Total"].sum()
 
         st.metric("Comparativo de Faturamento", f"{formatar_reais(vendas_p2)}", delta=f"{((vendas_p2-vendas_p1)/vendas_p1*100):.2f}%" if vendas_p1 else "0%")
 
