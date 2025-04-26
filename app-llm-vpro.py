@@ -1,10 +1,10 @@
 # versão incrementada com 
-#📈 Cards de métricas (Faturamento, Comissão, Clientes Únicos, Churn Rate)
-#📆 Gráficos semanais e mensais
-#🔥 Comparativo de períodos com delta %
-#🧹 Cálculo de churn automático usando o último status por código de venda
-#📥 Exportação de relatório filtrado
-#💬 Perguntas rápidas e perguntas livres (mantidas!)
+# Cards de métricas (Faturamento, Comissão, Clientes Únicos, Churn Rate)
+# Gráficos semanais e mensais
+# Comparativo de períodos com delta %
+# Cálculo de churn automático usando o último status por código de venda
+# Exportação de relatório filtrado
+# Perguntas rápidas e perguntas livres (mantidas!)
 
 import streamlit as st
 import pandas as pd
