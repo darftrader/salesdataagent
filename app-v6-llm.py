@@ -16,19 +16,33 @@ def formatar_reais(valor):
 # Função para corrigir valores numéricos e tratar erros
 def corrigir_coluna(df, col):
     try:
-        # Remover pontos e substituir vírgulas por ponto
-        df[col] = df[col].astype(str).str.replace(".", "").str.replace(",", ".")
-        # Converter para float, forçando o tratamento de valores não numéricos
+        df[col] = (
+            df[col]
+            .astype(str)
+            .str.replace("R\$", "", regex=True)
+            .str.replace("\xa0", "", regex=True)
+            .str.replace(".", "", regex=False)
+            .str.replace(",", ".", regex=False)
+            .str.strip()
+        )
         df[col] = pd.to_numeric(df[col], errors='coerce')
     except Exception as e:
         st.error(f"Erro ao processar a coluna {col}: {e}")
     return df
 
+# Função extra para validar colunas numéricas
+def validar_colunas(df, colunas):
+    for col in colunas:
+        if col in df.columns:
+            if df[col].isnull().all():
+                st.warning(f"Atenção: a coluna {col} está com todos os valores nulos após a conversão.")
+            else:
+                st.success(f"Coluna {col} carregada corretamente.")
+
 # Função para interpretar perguntas livres
 def interpretar_pergunta(pergunta, df):
     pergunta = pergunta.lower()
 
-    # Dicionário de intenções simples
     intencoes = {
         "total de vendas": ["total de vendas", "quanto vendi", "total vendido", "vendas"],
         "total de comissões": ["total comissão", "comissão paga", "quanto comissionei"],
@@ -38,7 +52,6 @@ def interpretar_pergunta(pergunta, df):
         "faturamento por cidade": ["vendas por cidade", "faturamento cidade", "cidade vendeu"],
     }
 
-    # TF-IDF para matching de perguntas
     corpus = []
     tags = []
     for key, frases in intencoes.items():
@@ -54,7 +67,6 @@ def interpretar_pergunta(pergunta, df):
     idx = np.argmax(similaridades)
     intencao_detectada = tags[idx]
 
-    # Gera a resposta baseada na intenção
     if intencao_detectada == "total de vendas":
         total = df["Total"].sum()
         return f"💰 Total de vendas: {formatar_reais(total)}"
@@ -84,13 +96,16 @@ def main():
     uploaded_file = st.file_uploader("Faça upload do seu arquivo CSV", type=["csv"])
 
     if uploaded_file:
-        # Ler o CSV
         df = pd.read_csv(uploaded_file, delimiter=";")
 
         # Corrigir valores numéricos
-        for col in ["Total", "Comissão", "Desconto (Valor)", "Taxas"]:
+        colunas_numericas = ["Total", "Comissão", "Desconto (Valor)", "Taxas"]
+        for col in colunas_numericas:
             if col in df.columns:
                 df = corrigir_coluna(df, col)
+
+        # Validar se a correção deu certo
+        validar_colunas(df, colunas_numericas)
 
         # Corrigir datas
         if "Iniciada em" in df.columns:
@@ -114,7 +129,6 @@ def main():
         afiliado = st.sidebar.selectbox("Afiliado", ["Todos"] + sorted(df["Afiliado (Nome)"].dropna().unique().tolist()))
         cidade = st.sidebar.selectbox("Cidade", ["Todos"] + sorted(df["Cliente (Cidade)"].dropna().unique().tolist()))
 
-        # Aplicar filtros
         df_filtrado = df[
             (df["Iniciada em"].dt.date >= data_inicio) & 
             (df["Iniciada em"].dt.date <= data_fim)
@@ -137,12 +151,10 @@ def main():
         # Gráfico de vendas por data
         st.subheader("📈 Vendas ao Longo do Tempo")
         vendas_diarias = df_filtrado.groupby(df_filtrado["Iniciada em"].dt.date)["Total"].sum()
-
         st.line_chart(vendas_diarias)
 
         # --- PERGUNTAS LIVRES ---
         st.subheader("🤔 Pergunte algo sobre os dados")
-
         pergunta = st.text_input("Digite sua pergunta:")
 
         if pergunta:
