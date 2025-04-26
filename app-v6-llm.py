@@ -13,6 +13,17 @@ def formatar_reais(valor):
     except:
         return "R$ 0,00"
 
+# Função para corrigir valores numéricos e tratar erros
+def corrigir_coluna(df, col):
+    try:
+        # Remover pontos e substituir vírgulas por ponto
+        df[col] = df[col].astype(str).str.replace(".", "").str.replace(",", ".")
+        # Converter para float, forçando o tratamento de valores não numéricos
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+    except Exception as e:
+        st.error(f"Erro ao processar a coluna {col}: {e}")
+    return df
+
 # Função para interpretar perguntas livres
 def interpretar_pergunta(pergunta, df):
     pergunta = pergunta.lower()
@@ -79,7 +90,7 @@ def main():
         # Corrigir valores numéricos
         for col in ["Total", "Comissão", "Desconto (Valor)", "Taxas"]:
             if col in df.columns:
-                df[col] = df[col].astype(str).str.replace(".", "").str.replace(",", ".").astype(float)
+                df = corrigir_coluna(df, col)
 
         # Corrigir datas
         if "Iniciada em" in df.columns:
