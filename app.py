@@ -22,16 +22,18 @@ if 'Total' in df.columns:
     total_vendas = df['Total'].sum()
     insights.append(f"💰 Total de vendas: R$ {total_vendas:,.2f}")
 
-
     # Desconto total aplicado
-    if 'Desconto (Valor)' in df.columns:
-        total_desconto = df['Desconto (Valor)'].sum()
-        insights.append(f"💸 Total de descontos aplicados: R$ {total_desconto:,.2f}")
+if 'Desconto (Valor)' in df.columns:
+    df['Desconto (Valor)'] = pd.to_numeric(df['Desconto (Valor)', errors='coerce')
+    total_desconto = df['Desconto (Valor)'].sum()
+    insights.append(f"💸 Total de descontos aplicados: R$ {total_desconto:,.2f}")
 
     # Comissão dos afiliados
-    if 'Comissão' in df.columns:
-        total_comissao = df['Comissão'].sum()
-        insights.append(f"💼 Total de comissões dos afiliados: R$ {total_comissao:,.2f}")
+if 'Comissão' in df.columns:
+    df['Comissão'] = pd.to_numeric(df['Comissão'], errors='coerce')
+    total_comissao = df['Comissão'].sum()
+    insights.append(f"💼 Total de comissões dos afiliados: R$ {total_comissao:,.2f}")
+
 
     # Vendas por Status (Finalizado, Estornado, etc.)
     if 'Status' in df.columns:
