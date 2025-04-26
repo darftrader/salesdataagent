@@ -37,58 +37,6 @@ def corrigir_coluna(df, col):
         st.error(f"Erro ao processar a coluna {col}: {e}")
     return df
 
-def interpretar_pergunta(pergunta, df):
-    pergunta = pergunta.lower()
-    intencoes = {
-        "total de vendas": ["total de vendas", "quanto vendi", "total vendido", "vendas realizadas", "quanto foi faturado", "faturamento total", "valor arrecadado"],
-        "total de comissões": ["total comissão", "comissão paga", "quanto comissionei", "quanto paguei de comissão", "comissões totais", "valor de comissão"],
-        "produtos vendidos": ["quais produtos", "produtos vendidos", "lista de produtos", "o que foi vendido", "produtos comercializados", "produtos comprados"],
-        "top afiliados": ["quem vendeu mais", "melhores afiliados", "top afiliados", "quem gerou mais vendas", "afiliado que mais vendeu", "ranking de afiliados"],
-        "faturamento por cidade": ["vendas por cidade", "faturamento cidade", "cidade vendeu", "qual cidade vendeu mais", "ranking cidades vendas", "vendas por localização"],
-        "ticket médio": ["ticket médio", "valor médio de venda", "quanto é o ticket médio", "média por venda", "ticket médio vendas"],
-        "quantidade de vendas": ["quantidade de vendas", "quantas vendas fiz", "número de vendas", "vendas totais", "total de pedidos"]
-    }
-
-    corpus, tags = [], []
-    for key, frases in intencoes.items():
-        for frase in frases:
-            corpus.append(frase)
-            tags.append(key)
-
-    vectorizer = TfidfVectorizer()
-    X = vectorizer.fit_transform(corpus)
-    pergunta_vec = vectorizer.transform([pergunta])
-
-    similaridades = cosine_similarity(pergunta_vec, X)
-    idx = np.argmax(similaridades)
-    intencao_detectada = tags[idx]
-
-    if intencao_detectada == "total de vendas":
-        total = df["Total"].sum()
-        return f"💰 Total de vendas: {formatar_reais(total)}"
-    elif intencao_detectada == "total de comissões":
-        total = df["Comissão"].sum()
-        return f"💸 Total de comissões pagas: {formatar_reais(total)}"
-    elif intencao_detectada == "produtos vendidos":
-        produtos = df["Produto"].value_counts()
-        return "🛍️ Produtos vendidos:\n" + "\n".join([f"{produto}: {quantidade} vendas" for produto, quantidade in produtos.items()])
-    elif intencao_detectada == "top afiliados":
-        afiliados = df["Afiliado (Nome)"].value_counts().head(5)
-        return "🏆 Top afiliados:\n" + "\n".join([f"{k}: {v} vendas" for k, v in afiliados.items()])
-    elif intencao_detectada == "faturamento por cidade":
-        cidades = df.groupby("Cliente (Cidade)")["Total"].sum().sort_values(ascending=False).head(5)
-        return "🌍 Faturamento por cidade:\n" + "\n".join([f"{k}: {formatar_reais(v)}" for k, v in cidades.items()])
-    elif intencao_detectada == "ticket médio":
-        vendas = df["Total"].sum()
-        quantidade = df["Total"].count()
-        ticket_medio = vendas / quantidade if quantidade else 0
-        return f"📈 Ticket médio: {formatar_reais(ticket_medio)}"
-    elif intencao_detectada == "quantidade de vendas":
-        quantidade = df["Total"].count()
-        return f"🛒 Quantidade total de vendas: {quantidade}"
-    else:
-        return "🤖 Desculpe, não entendi a pergunta. Tente reformular!"
-
 def calcular_estorno(df):
     if "Código" not in df.columns or "Status" not in df.columns:
         return 0
@@ -124,40 +72,6 @@ def main():
 
         st.success("Arquivo carregado com sucesso!")
 
-        # Perguntas rápidas e livres
-        st.subheader("🧐 Pergunte algo sobre os dados")
-        st.markdown("Escolha uma pergunta rápida ou digite sua pergunta:")
-
-        col1, col2 = st.columns(2)
-        perguntas_rapidas = {
-            "💰 Total de Vendas": "total de vendas",
-            "💸 Total de Comissões": "total comissão",
-            "🛍️ Produtos Vendidos": "quais produtos",
-            "🏆 Top Afiliados": "quem vendeu mais",
-            "🌍 Faturamento por Cidade": "vendas por cidade",
-            "📈 Ticket Médio": "ticket médio",
-            "🛒 Quantidade de Vendas": "quantidade de vendas"
-        }
-
-        pergunta_selecionada = None
-        with col1:
-            for nome_exibido, pergunta_real in list(perguntas_rapidas.items())[::2]:
-                if st.button(nome_exibido):
-                    pergunta_selecionada = pergunta_real
-        with col2:
-            for nome_exibido, pergunta_real in list(perguntas_rapidas.items())[1::2]:
-                if st.button(nome_exibido):
-                    pergunta_selecionada = pergunta_real
-
-        pergunta_manual = st.text_input("Ou digite sua pergunta:")
-        if pergunta_selecionada:
-            resposta = interpretar_pergunta(pergunta_selecionada, df)
-            st.info(resposta)
-        elif pergunta_manual:
-            resposta = interpretar_pergunta(pergunta_manual, df)
-            st.info(resposta)
-
-        # Filtros
         st.sidebar.header("🔍 Filtros")
         data_min = df["Iniciada em"].min()
         data_max = df["Iniciada em"].max()
@@ -178,7 +92,6 @@ def main():
         if metodo_pagamento != "Todos":
             df_filtrado = df_filtrado[df_filtrado["Método de Pagamento"] == metodo_pagamento]
 
-        # Cards principais
         total_vendas = df_filtrado["Total"].sum()
         total_comissao = df_filtrado["Comissão"].sum()
         ticket_medio = total_vendas / df_filtrado["Total"].count() if df_filtrado["Total"].count() else 0
@@ -191,7 +104,6 @@ def main():
         col3.metric("⚡ Chargeback", f"{chargeback:.2f}%")
         col4.metric("🔄 Estornos", f"{estorno:.2f}%")
 
-        # Gráficos
         st.subheader("📅 Vendas por Semana")
         vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
         st.line_chart(vendas_semana)
@@ -199,8 +111,7 @@ def main():
         st.subheader("📊 Faturamento Mensal")
         faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
-        
-        # 📈 Análise Automática de Tendências
+
         st.subheader("🔎 Análise Automática de Tendências")
 
         if not vendas_semana.empty and vendas_semana.shape[0] > 1:
@@ -235,8 +146,7 @@ def main():
             st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
         if estorno > 5:
             st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
-      
-        # Comparativo de períodos
+
         st.subheader("🔄 Comparativo entre Períodos")
         col5, col6 = st.columns(2)
         with col5:
