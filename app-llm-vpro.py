@@ -40,7 +40,16 @@ def corrigir_coluna(df, col):
 # Função para interpretar perguntas livres
 def interpretar_pergunta(pergunta, df):
     pergunta = pergunta.lower()
-    intencoes = { ... } # Mantemos como estava anteriormente
+    intencoes = {
+        "total de vendas": ["total de vendas", "quanto vendi", "total vendido", "vendas realizadas", "quanto foi faturado", "faturamento total", "valor arrecadado"],
+        "total de comissões": ["total comissão", "comissão paga", "quanto comissionei", "quanto paguei de comissão", "comissões totais", "valor de comissão"],
+        "clientes únicos": ["quantos clientes", "clientes diferentes", "clientes únicos", "quantos compradores", "número de clientes", "quantas pessoas compraram"],
+        "produtos vendidos": ["quais produtos", "produtos vendidos", "lista de produtos", "o que foi vendido", "produtos comercializados", "produtos comprados"],
+        "top afiliados": ["quem vendeu mais", "melhores afiliados", "top afiliados", "quem gerou mais vendas", "afiliado que mais vendeu", "ranking de afiliados"],
+        "faturamento por cidade": ["vendas por cidade", "faturamento cidade", "cidade vendeu", "qual cidade vendeu mais", "ranking cidades vendas", "vendas por localização"],
+        "ticket médio": ["ticket médio", "valor médio de venda", "quanto é o ticket médio", "média por venda", "ticket médio vendas"],
+        "quantidade de vendas": ["quantidade de vendas", "quantas vendas fiz", "número de vendas", "vendas totais", "total de pedidos"]
+    }
 
     corpus, tags = [], []
     for key, frases in intencoes.items():
@@ -56,10 +65,36 @@ def interpretar_pergunta(pergunta, df):
     idx = np.argmax(similaridades)
     intencao_detectada = tags[idx]
 
-    # Casos de interpretação como antes
-    ...
+    if intencao_detectada == "total de vendas":
+        total = df["Total"].sum()
+        return f"💰 Total de vendas: {formatar_reais(total)}"
+    elif intencao_detectada == "total de comissões":
+        total = df["Comissão"].sum()
+        return f"💸 Total de comissões pagas: {formatar_reais(total)}"
+    elif intencao_detectada == "clientes únicos":
+        total = df["Cliente (E-mail)"].nunique()
+        return f"👥 Número de clientes únicos: {total}"
+    elif intencao_detectada == "produtos vendidos":
+        produtos = df["Produto"].unique()
+        return "🛍️ Produtos vendidos:\n" + "\n".join(produtos)
+    elif intencao_detectada == "top afiliados":
+        afiliados = df["Afiliado (Nome)"].value_counts().head(5)
+        return "🏆 Top afiliados:\n" + "\n".join([f"{k}: {v} vendas" for k, v in afiliados.items()])
+    elif intencao_detectada == "faturamento por cidade":
+        cidades = df.groupby("Cliente (Cidade)")["Total"].sum().sort_values(ascending=False).head(5)
+        return "🌍 Faturamento por cidade:\n" + "\n".join([f"{k}: {formatar_reais(v)}" for k, v in cidades.items()])
+    elif intencao_detectada == "ticket médio":
+        vendas = df["Total"].sum()
+        quantidade = df["Total"].count()
+        ticket_medio = vendas / quantidade if quantidade else 0
+        return f"📈 Ticket médio: {formatar_reais(ticket_medio)}"
+    elif intencao_detectada == "quantidade de vendas":
+        quantidade = df["Total"].count()
+        return f"🛒 Quantidade total de vendas: {quantidade}"
+    else:
+        return "🤖 Desculpe, não entendi a pergunta. Tente reformular!"
 
-# Nova função para calcular churn rate
+# Função para calcular churn rate
 def calcular_churn(df):
     if "Código" not in df.columns or "Status" not in df.columns:
         return 0
@@ -142,8 +177,39 @@ def main():
         # Exporta relatório CSV
         st.download_button("📂 Baixar Relatório Filtrado", df_filtrado.to_csv(index=False).encode('utf-8'), "relatorio_pro.csv", "text/csv")
 
-        # Perguntas rápidas e livres como antes
-        ...
+        # Perguntas rápidas e livres
+        st.subheader("🧐 Pergunte algo sobre os dados")
+        st.markdown("Escolha uma pergunta rápida ou digite sua pergunta:")
+
+        col1, col2 = st.columns(2)
+        perguntas_rapidas = {
+            "💰 Total de Vendas": "total de vendas",
+            "💸 Total de Comissões": "total comissão",
+            "👥 Clientes Únicos": "quantos clientes",
+            "🛍️ Produtos Vendidos": "quais produtos",
+            "🏆 Top Afiliados": "quem vendeu mais",
+            "🌍 Faturamento por Cidade": "vendas por cidade",
+            "📈 Ticket Médio": "ticket médio",
+            "🛒 Quantidade de Vendas": "quantidade de vendas"
+        }
+
+        pergunta_selecionada = None
+        with col1:
+            for nome_exibido, pergunta_real in list(perguntas_rapidas.items())[::2]:
+                if st.button(nome_exibido):
+                    pergunta_selecionada = pergunta_real
+        with col2:
+            for nome_exibido, pergunta_real in list(perguntas_rapidas.items())[1::2]:
+                if st.button(nome_exibido):
+                    pergunta_selecionada = pergunta_real
+
+        pergunta_manual = st.text_input("Ou digite sua pergunta:")
+        if pergunta_selecionada:
+            resposta = interpretar_pergunta(pergunta_selecionada, df_filtrado)
+            st.info(resposta)
+        elif pergunta_manual:
+            resposta = interpretar_pergunta(pergunta_manual, df_filtrado)
+            st.info(resposta)
 
 if __name__ == "__main__":
     main()
