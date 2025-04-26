@@ -199,6 +199,31 @@ def main():
         faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
 
+        # 📈 Análise Automática de Tendências
+        st.subheader("🔎 Análise Automática de Tendências")
+
+        tendencia_vendas = vendas_semana.pct_change().mean() * 100 if len(vendas_semana) > 1 else 0
+        tendencia_ticket = faturamento_mes.pct_change().mean() * 100 if len(faturamento_mes) > 1 else 0
+
+        if tendencia_vendas > 0:
+            st.success(f"📈 As vendas estão crescendo em média {tendencia_vendas:.2f}% por semana.")
+        elif tendencia_vendas < 0:
+            st.error(f"📉 As vendas estão caindo em média {abs(tendencia_vendas):.2f}% por semana.")
+        else:
+            st.info("➖ As vendas estão estáveis nas últimas semanas.")
+
+        if tendencia_ticket > 0:
+            st.success(f"📈 O faturamento mensal aumentou em média {tendencia_ticket:.2f}%.")
+        elif tendencia_ticket < 0:
+            st.error(f"📉 O faturamento mensal caiu em média {abs(tendencia_ticket):.2f}%.")
+        else:
+            st.info("➖ O faturamento mensal está estável.")
+
+        if chargeback > 5:
+            st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
+        if estorno > 5:
+            st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
+      
         # Comparativo de períodos
         st.subheader("🔄 Comparativo entre Períodos")
         col5, col6 = st.columns(2)
@@ -214,7 +239,7 @@ def main():
 
         st.metric("Comparativo de Faturamento", f"{formatar_reais(vendas_p2)}", delta=f"{((vendas_p2-vendas_p1)/vendas_p1*100):.2f}%" if vendas_p1 else "0%")
 
-        st.download_button("📂 Baixar Relatório Filtrado", df_filtrado.to_csv(index=False).encode('utf-8'), "relatorio_pro.csv", "text/csv")
+        #st.download_button("📂 Baixar Relatório Filtrado", df_filtrado.to_csv(index=False).encode('utf-8'), "relatorio_pro.csv", "text/csv")
 
 if __name__ == "__main__":
     main()
