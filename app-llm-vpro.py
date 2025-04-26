@@ -199,42 +199,42 @@ def main():
         st.subheader("📊 Faturamento Mensal")
         faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
-    # 📈 Análise Automática de Tendências
-    st.subheader("🔎 Análise Automática de Tendências")
-    
-    if len(vendas_semana) > 1:
-        tendencia_vendas = vendas_semana.pct_change().mean() * 100
-        if np.isfinite(tendencia_vendas):
-            if tendencia_vendas > 0:
-                st.success(f"📈 As vendas estão crescendo em média {tendencia_vendas:.2f}% por semana.")
-            elif tendencia_vendas < 0:
-                st.error(f"📉 As vendas estão caindo em média {abs(tendencia_vendas):.2f}% por semana.")
+        
+        # 📈 Análise Automática de Tendências
+        st.subheader("🔎 Análise Automática de Tendências")
+
+        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
+            tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
+            if np.isfinite(tendencia_vendas):
+                if tendencia_vendas > 0:
+                    st.success(f"📈 As vendas estão crescendo em média {tendencia_vendas:.2f}% por semana.")
+                elif tendencia_vendas < 0:
+                    st.error(f"📉 As vendas estão caindo em média {abs(tendencia_vendas):.2f}% por semana.")
+                else:
+                    st.info("➖ As vendas estão estáveis nas últimas semanas.")
             else:
-                st.info("➖ As vendas estão estáveis nas últimas semanas.")
+                st.info("➖ Dados insuficientes para analisar tendência de vendas.")
         else:
             st.info("➖ Dados insuficientes para analisar tendência de vendas.")
-    else:
-        st.info("➖ Dados insuficientes para analisar tendência de vendas.")
-    
-    if len(faturamento_mes) > 1:
-        tendencia_ticket = faturamento_mes.pct_change().mean() * 100
-        if np.isfinite(tendencia_ticket):
-            if tendencia_ticket > 0:
-                st.success(f"📈 O faturamento mensal aumentou em média {tendencia_ticket:.2f}%.")
-            elif tendencia_ticket < 0:
-                st.error(f"📉 O faturamento mensal caiu em média {abs(tendencia_ticket):.2f}%.")
+
+        if not faturamento_mes.empty and faturamento_mes.shape[0] > 1:
+            tendencia_ticket = faturamento_mes.pct_change().dropna().mean() * 100
+            if np.isfinite(tendencia_ticket):
+                if tendencia_ticket > 0:
+                    st.success(f"📈 O faturamento mensal aumentou em média {tendencia_ticket:.2f}%.")
+                elif tendencia_ticket < 0:
+                    st.error(f"📉 O faturamento mensal caiu em média {abs(tendencia_ticket):.2f}%.")
+                else:
+                    st.info("➖ O faturamento mensal está estável.")
             else:
-                st.info("➖ O faturamento mensal está estável.")
+                st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
         else:
             st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
-    else:
-        st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
-    
-    if chargeback > 5:
-        st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
-    if estorno > 5:
-        st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
 
+        if chargeback > 5:
+            st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
+        if estorno > 5:
+            st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
       
         # Comparativo de períodos
         st.subheader("🔄 Comparativo entre Períodos")
