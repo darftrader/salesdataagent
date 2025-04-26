@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re
 from datetime import datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -13,7 +12,7 @@ def formatar_reais(valor):
     except:
         return "R$ 0,00"
 
-# Função para corrigir valores numéricos e tratar erros
+# Função para corrigir valores numéricos
 def corrigir_coluna(df, col):
     try:
         df[col] = (
@@ -30,39 +29,47 @@ def corrigir_coluna(df, col):
         st.error(f"Erro ao processar a coluna {col}: {e}")
     return df
 
-# Função extra para validar colunas numéricas
-def validar_colunas(df, colunas):
-    for col in colunas:
-        if col in df.columns:
-            if df[col].isnull().all():
-                st.warning(f"Atenção: a coluna {col} está com todos os valores nulos após a conversão.")
-            else:
-                st.success(f"Coluna {col} carregada corretamente.")
-
 # Função para interpretar perguntas livres
 def interpretar_pergunta(pergunta, df):
     pergunta = pergunta.lower()
 
     intencoes = {
-        "total de vendas": ["total de vendas", "quanto vendi", "total vendido", "vendas"],
-        "total de comissões": ["total comissão", "comissão paga", "quanto comissionei"],
-        "clientes únicos": ["quantos clientes", "clientes diferentes", "clientes únicos"],
-        "produtos vendidos": ["quais produtos", "produtos vendidos", "lista de produtos"],
-        "top afiliados": ["quem vendeu mais", "melhores afiliados", "top afiliados"],
-        "faturamento por cidade": ["vendas por cidade", "faturamento cidade", "cidade vendeu"],
+        "total de vendas": [
+            "total de vendas", "quanto vendi", "total vendido", "vendas realizadas", "quanto foi faturado", "faturamento total", "valor arrecadado"
+        ],
+        "total de comissões": [
+            "total comissão", "comissão paga", "quanto comissionei", "quanto paguei de comissão", "comissões totais", "valor de comissão"
+        ],
+        "clientes únicos": [
+            "quantos clientes", "clientes diferentes", "clientes únicos", "quantos compradores", "número de clientes", "quantas pessoas compraram"
+        ],
+        "produtos vendidos": [
+            "quais produtos", "produtos vendidos", "lista de produtos", "o que foi vendido", "produtos comercializados", "produtos comprados"
+        ],
+        "top afiliados": [
+            "quem vendeu mais", "melhores afiliados", "top afiliados", "quem gerou mais vendas", "afiliado que mais vendeu", "ranking de afiliados"
+        ],
+        "faturamento por cidade": [
+            "vendas por cidade", "faturamento cidade", "cidade vendeu", "qual cidade vendeu mais", "ranking cidades vendas", "vendas por localização"
+        ],
+        "ticket médio": [
+            "ticket médio", "valor médio de venda", "quanto é o ticket médio", "média por venda", "ticket médio vendas"
+        ],
+        "quantidade de vendas": [
+            "quantidade de vendas", "quantas vendas fiz", "número de vendas", "vendas totais", "total de pedidos"
+        ]
     }
 
-    corpus = []
-    tags = []
+    corpus, tags = [], []
     for key, frases in intencoes.items():
         for frase in frases:
             corpus.append(frase)
             tags.append(key)
-    
+
     vectorizer = TfidfVectorizer()
     X = vectorizer.fit_transform(corpus)
     pergunta_vec = vectorizer.transform([pergunta])
-    
+
     similaridades = cosine_similarity(pergunta_vec, X)
     idx = np.argmax(similaridades)
     intencao_detectada = tags[idx]
@@ -84,37 +91,39 @@ def interpretar_pergunta(pergunta, df):
         return "🏆 Top afiliados:\n" + "\n".join([f"{k}: {v} vendas" for k, v in afiliados.items()])
     elif intencao_detectada == "faturamento por cidade":
         cidades = df.groupby("Cliente (Cidade)")["Total"].sum().sort_values(ascending=False).head(5)
-        return "🏙️ Faturamento por cidade:\n" + "\n".join([f"{k}: {formatar_reais(v)}" for k, v in cidades.items()])
+        return "🌍 Faturamento por cidade:\n" + "\n".join([f"{k}: {formatar_reais(v)}" for k, v in cidades.items()])
+    elif intencao_detectada == "ticket médio":
+        vendas = df["Total"].sum()
+        quantidade = df["Total"].count()
+        ticket_medio = vendas / quantidade if quantidade else 0
+        return f"📈 Ticket médio: {formatar_reais(ticket_medio)}"
+    elif intencao_detectada == "quantidade de vendas":
+        quantidade = df["Total"].count()
+        return f"🛒 Quantidade total de vendas: {quantidade}"
     else:
         return "🤖 Desculpe, não entendi a pergunta. Tente reformular!"
 
 # Função principal
 def main():
-    st.set_page_config(page_title="SalesDataAgent 6.0", layout="wide")
-    st.title("🤖 SalesDataAgent 6.0 — Análise Inteligente de Vendas")
+    st.set_page_config(page_title="SalesDataAgent TURBO", layout="wide")
+    st.title("🧪 SalesDataAgent TURBO")
 
-    uploaded_file = st.file_uploader("Faça upload do seu arquivo CSV", type=["csv"])
+    uploaded_file = st.file_uploader("📎 Faça upload do seu arquivo CSV", type=["csv"])
 
     if uploaded_file:
         df = pd.read_csv(uploaded_file, delimiter=";")
 
-        # Corrigir valores numéricos
-        colunas_numericas = ["Total", "Comissão", "Desconto (Valor)", "Taxas"]
-        for col in colunas_numericas:
+        for col in ["Total", "Comissão", "Desconto (Valor)", "Taxas"]:
             if col in df.columns:
                 df = corrigir_coluna(df, col)
 
-        # Validar se a correção deu certo
-        validar_colunas(df, colunas_numericas)
-
-        # Corrigir datas
         if "Iniciada em" in df.columns:
             df["Iniciada em"] = pd.to_datetime(df["Iniciada em"], errors='coerce')
 
         st.success("Arquivo carregado com sucesso!")
 
-        # --- FILTROS DINÂMICOS ---
-        st.sidebar.header("🔎 Filtros")
+        # --- FILTROS ---
+        st.sidebar.header("🔍 Filtros")
 
         data_min = df["Iniciada em"].min()
         data_max = df["Iniciada em"].max()
@@ -141,26 +150,64 @@ def main():
             df_filtrado = df_filtrado[df_filtrado["Cliente (Cidade)"] == cidade]
 
         # --- DASHBOARD ---
-        st.subheader("📊 Resumo dos Dados Filtrados")
+        st.subheader("📊 Resumo dos Dados")
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Total de Vendas", formatar_reais(df_filtrado["Total"].sum()))
         col2.metric("Total de Comissões", formatar_reais(df_filtrado["Comissão"].sum()))
         col3.metric("Clientes Únicos", df_filtrado["Cliente (E-mail)"].nunique())
 
-        # Gráfico de vendas por data
-        st.subheader("📈 Vendas ao Longo do Tempo")
-        vendas_diarias = df_filtrado.groupby(df_filtrado["Iniciada em"].dt.date)["Total"].sum()
-        st.line_chart(vendas_diarias)
+        # Gráfico de vendas por cidade
+        st.subheader("🌍 Faturamento por Cidade")
+        cidades = df_filtrado.groupby("Cliente (Cidade)")["Total"].sum().sort_values(ascending=False)
+        st.bar_chart(cidades)
 
-        # --- PERGUNTAS LIVRES ---
-        st.subheader("🤔 Pergunte algo sobre os dados")
-        pergunta = st.text_input("Digite sua pergunta:")
+        # Ranking de afiliados
+        st.subheader("🏆 Ranking de Afiliados")
+        afiliados = df_filtrado["Afiliado (Nome)"].value_counts()
+        st.bar_chart(afiliados)
 
-        if pergunta:
-            resposta = interpretar_pergunta(pergunta, df_filtrado)
+        # Exportar CSV filtrado
+        st.download_button("📂 Baixar Relatório Filtrado", df_filtrado.to_csv(index=False).encode('utf-8'), "relatorio_filtrado.csv", "text/csv")
+
+        # --- PERGUNTAS ---
+        st.subheader("🧐 Pergunte algo sobre os dados")
+
+        st.markdown("Escolha uma pergunta rápida ou digite a sua:")
+
+        col1, col2 = st.columns(2)
+
+        perguntas_rapidas = {
+            "💰 Total de Vendas": "total de vendas",
+            "💸 Total de Comissões": "total comissão",
+            "👥 Clientes Únicos": "quantos clientes",
+            "🛍️ Produtos Vendidos": "quais produtos",
+            "🏆 Top Afiliados": "quem vendeu mais",
+            "🌍 Faturamento por Cidade": "vendas por cidade",
+            "📈 Ticket Médio": "ticket médio",
+            "🛒 Quantidade de Vendas": "quantidade de vendas"
+        }
+
+        pergunta_selecionada = None
+
+        with col1:
+            for nome_exibido, pergunta_real in list(perguntas_rapidas.items())[::2]:
+                if st.button(nome_exibido):
+                    pergunta_selecionada = pergunta_real
+
+        with col2:
+            for nome_exibido, pergunta_real in list(perguntas_rapidas.items())[1::2]:
+                if st.button(nome_exibido):
+                    pergunta_selecionada = pergunta_real
+
+        pergunta_manual = st.text_input("Ou digite sua pergunta:")
+
+        if pergunta_selecionada:
+            resposta = interpretar_pergunta(pergunta_selecionada, df_filtrado)
+            st.info(resposta)
+        elif pergunta_manual:
+            resposta = interpretar_pergunta(pergunta_manual, df_filtrado)
             st.info(resposta)
 
-# Rodar app
 if __name__ == "__main__":
     main()
