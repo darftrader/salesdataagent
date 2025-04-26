@@ -110,7 +110,6 @@ def main():
             data_inicio, data_fim = st.date_input("Selecione o intervalo de datas:", [data_min, data_max])
             comparativo_inicio, comparativo_fim = data_inicio, data_fim
 
-        # Filtros laterais
         st.sidebar.header("🔍 Filtros Adicionais")
         afiliado = st.sidebar.selectbox("Afiliado", ["Todos"] + sorted(df["Afiliado (Nome)"].dropna().unique().tolist()))
         cidade = st.sidebar.selectbox("Cidade", ["Todos"] + sorted(df["Cliente (Cidade)"].dropna().unique().tolist()))
@@ -118,7 +117,7 @@ def main():
         metodo_pagamento = st.sidebar.selectbox("Método de Pagamento", ["Todos"] + sorted(df["Método de Pagamento"].dropna().unique().tolist()))
 
         df_filtrado = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]
-   
+
         if afiliado != "Todos":
             df_filtrado = df_filtrado[df_filtrado["Afiliado (Nome)"] == afiliado]
         if cidade != "Todos":
@@ -128,8 +127,13 @@ def main():
         if metodo_pagamento != "Todos":
             df_filtrado = df_filtrado[df_filtrado["Método de Pagamento"] == metodo_pagamento]
 
-        st.subheader("🔎 Análise Automática de Tendências")
+        st.subheader("📅 Vendas por Semana")
+        vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
 
+        st.subheader("📊 Faturamento Mensal")
+        faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
+
+        st.subheader("🔎 Análise Automática de Tendências")
         if not vendas_semana.empty and vendas_semana.shape[0] > 1:
             tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
             if np.isfinite(tendencia_vendas):
@@ -150,11 +154,6 @@ def main():
                 else:
                     st.info("➖ O faturamento mensal está estável.")
 
-        if chargeback > 5:
-            st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
-        if estorno > 5:
-            st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
-                
         total_vendas = df_filtrado["Total"].sum()
         total_comissao = df_filtrado["Comissão"].sum()
         ticket_medio = total_vendas / df_filtrado["Total"].count() if df_filtrado["Total"].count() else 0
@@ -167,16 +166,10 @@ def main():
         col3.metric("⚡ Chargeback", f"{chargeback:.2f}%")
         col4.metric("🔄 Estornos", f"{estorno:.2f}%")
 
-        st.subheader("📅 Vendas por Semana")
-        vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
         st.line_chart(vendas_semana)
-
-        st.subheader("📊 Faturamento Mensal")
-        faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
 
         st.subheader("🔄 Comparativo entre Períodos")
-
         vendas_p1 = df[(df["Iniciada em"].dt.date >= comparativo_inicio) & (df["Iniciada em"].dt.date <= comparativo_fim)]["Total"].sum()
         vendas_p2 = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]["Total"].sum()
 
