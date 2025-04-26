@@ -16,10 +16,12 @@ def carregar_dados(caminho_csv):
 def gerar_insights(df):
     insights = []
 
-    # Total de vendas
-    if 'Total' in df.columns:
-        total_vendas = df['Total'].sum()
-        insights.append(f"💰 Total de vendas: R$ {total_vendas:,.2f}")
+# Total de vendas
+if 'Total' in df.columns:
+    df['Total'] = pd.to_numeric(df['Total'], errors='coerce')  # <-- força a ser número
+    total_vendas = df['Total'].sum()
+    insights.append(f"💰 Total de vendas: R$ {total_vendas:,.2f}")
+
 
     # Desconto total aplicado
     if 'Desconto (Valor)' in df.columns:
