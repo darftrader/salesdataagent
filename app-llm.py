@@ -19,22 +19,24 @@ def gerar_insights(df):
     colunas_numericas = ['Total', 'Comissão', 'Desconto (Valor)', 'Taxas', 'Parcelamento sem juros']
     for coluna in colunas_numericas:
         if coluna in df.columns:
+            df[coluna] = df[coluna].astype(str)
+            df[coluna] = df[coluna].str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
             df[coluna] = pd.to_numeric(df[coluna], errors='coerce')
 
     # Total de vendas
     if 'Total' in df.columns:
         total_vendas = df['Total'].sum()
-        insights.append(f"💰 Total de vendas: R$ {total_vendas:,.2f}")
+        insights.append(f"💰 Total de vendas: R$ {total_vendas:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
     # Desconto total aplicado
     if 'Desconto (Valor)' in df.columns:
         total_desconto = df['Desconto (Valor)'].sum()
-        insights.append(f"💸 Total de descontos aplicados: R$ {total_desconto:,.2f}")
+        insights.append(f"💸 Total de descontos aplicados: R$ {total_desconto:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
     # Comissão dos afiliados
     if 'Comissão' in df.columns:
         total_comissao = df['Comissão'].sum()
-        insights.append(f"💼 Total de comissões dos afiliados: R$ {total_comissao:,.2f}")
+        insights.append(f"💼 Total de comissões dos afiliados: R$ {total_comissao:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
     # Vendas por Status
     if 'Status' in df.columns:
@@ -87,7 +89,7 @@ def gerar_grafico(df):
 
         fig, ax = plt.subplots(figsize=(10, 5))
         vendas_diarias.plot(ax=ax, marker='o', title='Vendas Diárias')
-        ax.set_ylabel('Total Vendido')
+        ax.set_ylabel('Total Vendido (R$)')
         ax.set_xlabel('Data')
         ax.grid(True)
         return fig
@@ -99,7 +101,8 @@ def responder_pergunta(pergunta, df):
     pergunta = pergunta.lower()
 
     if "total" in pergunta and "venda" in pergunta:
-        return f"O total de vendas foi R$ {df['Total'].sum():,.2f}"
+        total = df['Total'].sum()
+        return f"O total de vendas foi R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     elif "clientes únicos" in pergunta or "clientes distintos" in pergunta:
         return f"O número de clientes distintos foi {df['Cliente (E-mail)'].nunique()}"
     elif "maior faturamento" in pergunta:
@@ -108,7 +111,7 @@ def responder_pergunta(pergunta, df):
             faturamento_mes = df_temp['Total'].resample('M').sum()
             mes_top = faturamento_mes.idxmax()
             valor_top = faturamento_mes.max()
-            return f"O mês de maior faturamento foi {mes_top.strftime('%B/%Y')} com R$ {valor_top:,.2f}"
+            return f"O mês de maior faturamento foi {mes_top.strftime('%B/%Y')} com R$ {valor_top:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     elif "cidade" in pergunta:
         if 'Cliente (Cidade)' in df.columns:
             top_cidade = df['Cliente (Cidade)'].value_counts().idxmax()
@@ -123,7 +126,7 @@ def responder_pergunta(pergunta, df):
 # Função principal
 def main():
     st.set_page_config(page_title="Agente de Vendas 5.0", layout="wide")
-    st.title("🤖 Agente de Análise de Vendas 5.0 - Perguntas Livres")
+    st.title("🤖 Agente de Análise de Vendas 5.0 - Formato BR 🇧🇷")
 
     arquivo = st.file_uploader("📂 Faça upload do seu arquivo CSV", type=["csv"])
 
