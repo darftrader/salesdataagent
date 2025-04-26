@@ -70,13 +70,16 @@ def main():
 
         st.success("Arquivo carregado com sucesso!")
 
-        st.subheader("🗓️ Selecione o Período para Análise")
-
-        opcoes_periodo = ["Todo o Período", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses", "Personalizado"]
-        periodo_opcao = st.selectbox("Selecionar período:", opcoes_periodo)
-
         data_min = df["Iniciada em"].min().date()
         data_max = df["Iniciada em"].max().date()
+
+        opcoes_periodo = ["Todo o Período", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses", "Personalizado"]
+
+        col_filtros = st.columns([3, 1])
+        with col_filtros[0]:
+            st.subheader("🔎 Análise Automática de Tendências")
+        with col_filtros[1]:
+            periodo_opcao = st.selectbox("", opcoes_periodo)
 
         if periodo_opcao == "Todo o Período":
             data_inicio, data_fim = data_min, data_max
@@ -127,13 +130,9 @@ def main():
         if metodo_pagamento != "Todos":
             df_filtrado = df_filtrado[df_filtrado["Método de Pagamento"] == metodo_pagamento]
 
-        st.subheader("📅 Vendas por Semana")
         vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
-
-        st.subheader("📊 Faturamento Mensal")
         faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
 
-        st.subheader("🔎 Análise Automática de Tendências")
         if not vendas_semana.empty and vendas_semana.shape[0] > 1:
             tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
             if np.isfinite(tendencia_vendas):
@@ -166,7 +165,10 @@ def main():
         col3.metric("⚡ Chargeback", f"{chargeback:.2f}%")
         col4.metric("🔄 Estornos", f"{estorno:.2f}%")
 
+        st.subheader("📅 Vendas por Semana")
         st.line_chart(vendas_semana)
+
+        st.subheader("📊 Faturamento Mensal")
         st.bar_chart(faturamento_mes)
 
         st.subheader("🔄 Comparativo entre Períodos")
