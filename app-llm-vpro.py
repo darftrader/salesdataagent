@@ -1,4 +1,4 @@
-# versão incrementada com 
+# versão incrementada pro 
 # Perguntas predefinidas e campo de texto no início
 # Cards de Faturamento, Comissão, Chargeback e Estornos
 # Filtros adicionais: Afiliado, Cidade, Status da Venda, Método de Pagamento
