@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-import openai
 
 # Função para carregar dados
 def carregar_dados(caminho_csv):
