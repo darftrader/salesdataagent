@@ -7,15 +7,6 @@
 # Comparativo de períodos
 # Baixar relatório filtrado em CSV
 
-# versão incrementada com 
-# Perguntas predefinidas e campo de texto no início
-# Cards de Faturamento, Comissão, Chargeback e Estornos
-# Filtros adicionais: Afiliado, Cidade, Status da Venda, Método de Pagamento
-# Gráficos semanais e mensais
-# Análise Automática de Tendências
-# Comparativo de períodos
-# Baixar relatório filtrado em CSV
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -90,7 +81,7 @@ def responder_pergunta(pergunta, df):
                     afiliados = df['Afiliado (Nome)'].value_counts().head(5)
                     return "🏆 Top afiliados:\n" + "\n".join([f"{afiliado}: {quantidade}" for afiliado, quantidade in afiliados.items()])
                 elif intencao == "faturamento por cidade":
-                    cidades = df.groupby('Cliente (Cidade)')['Total'].sum().sort_values(ascending=False)
+                    cidades = df.groupby('Cliente (Cidade)')["Total"].sum().sort_values(ascending=False)
                     return "🏙️ Faturamento por cidade:\n" + "\n".join([f"{cidade}: {formatar_reais(valor)}" for cidade, valor in cidades.items()])
 
     return "❓ Não entendi sua pergunta. Tente reformular."
@@ -128,12 +119,12 @@ def main():
         cols = st.columns(3)
         for i, (titulo, intencao) in enumerate(perguntas_cards.items()):
             if cols[i % 3].button(titulo):
-                resposta = responder_pergunta(intencao, df)
+                resposta = responder_pergunta(intencao, df_filtrado)  # usa df_filtrado
                 st.success(resposta)
 
         pergunta_livre = st.text_input("✏️ Ou digite sua própria pergunta:")
         if pergunta_livre:
-            resposta = responder_pergunta(pergunta_livre, df)
+            resposta = responder_pergunta(pergunta_livre, df_filtrado)  # usa df_filtrado
             st.info(resposta)
 
         st.subheader("🗓️ Selecione o Período para Análise")
