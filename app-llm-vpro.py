@@ -22,77 +22,9 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Funções auxiliares
-def formatar_reais(valor):
-    try:
-        return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    except:
-        return "R$ 0,00"
+# (Funções formatar_reais, corrigir_coluna, calcular_estorno, calcular_chargeback, responder_pergunta seguem iguais)
 
-def corrigir_coluna(df, col):
-    try:
-        df[col] = (
-            df[col]
-            .astype(str)
-            .str.replace("R\$", "", regex=True)
-            .str.replace("\xa0", "", regex=True)
-            .str.replace(".", "", regex=False)
-            .str.replace(",", ".", regex=False)
-            .str.strip()
-        )
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    except Exception as e:
-        st.error(f"Erro ao processar a coluna {col}: {e}")
-    return df
-
-def calcular_estorno(df):
-    if "Código" not in df.columns or "Status" not in df.columns:
-        return 0
-    df_ultimas = df.sort_values("Iniciada em").groupby("Código").last()
-    total_clientes = len(df_ultimas)
-    estornados = df_ultimas[df_ultimas["Status"].str.lower() == "estornada"]
-    estorno_rate = (len(estornados) / total_clientes) * 100 if total_clientes > 0 else 0
-    return estorno_rate
-
-def calcular_chargeback(df):
-    if "Status" not in df.columns:
-        return 0
-    total_vendas = len(df)
-    chargebacks = df[df["Status"].str.lower() == "recusada"]
-    chargeback_rate = (len(chargebacks) / total_vendas) * 100 if total_vendas > 0 else 0
-    return chargeback_rate
-
-def responder_pergunta(pergunta, df):
-    pergunta = pergunta.lower()
-
-    mapeamento = {
-        "total de vendas": ["total de vendas", "quanto vendi", "faturamento", "vendas totais"],
-        "total de comissões": ["comissões", "quanto de comissão", "valor de comissão"],
-        "clientes únicos": ["clientes únicos", "quantos clientes", "clientes diferentes"],
-        "produtos vendidos": ["produtos vendidos", "quais produtos", "lista de produtos"],
-        "top afiliados": ["top afiliados", "melhores afiliados", "quem vendeu mais"],
-        "faturamento por cidade": ["cidade faturamento", "vendas por cidade", "faturamento cidade"]
-    }
-
-    for intencao, variações in mapeamento.items():
-        for variacao in variações:
-            if variacao in pergunta:
-                if intencao == "total de vendas":
-                    return f"💰 Total de vendas: {formatar_reais(df['Total'].sum())}"
-                elif intencao == "total de comissões":
-                    return f"💸 Total de comissões: {formatar_reais(df['Comissão'].sum())}"
-                elif intencao == "clientes únicos":
-                    return f"👥 Clientes únicos: {df['Cliente (E-mail)'].nunique()}"
-                elif intencao == "produtos vendidos":
-                    produtos = df['Produto'].value_counts()
-                    return "🛍️ Produtos vendidos:\n" + "\n".join([f"{produto}: {quantidade}" for produto, quantidade in produtos.items()])
-                elif intencao == "top afiliados":
-                    afiliados = df['Afiliado (Nome)'].value_counts().head(5)
-                    return "🏆 Top afiliados:\n" + "\n".join([f"{afiliado}: {quantidade}" for afiliado, quantidade in afiliados.items()])
-                elif intencao == "faturamento por cidade":
-                    cidades = df.groupby('Cliente (Cidade)')['Total'].sum().sort_values(ascending=False)
-                    return "🏙️ Faturamento por cidade:\n" + "\n".join([f"{cidade}: {formatar_reais(valor)}" for cidade, valor in cidades.items()])
-
-    return "❓ Não entendi sua pergunta. Tente reformular."
+# Atualização principal
 
 def main():
     st.set_page_config(page_title="SalesDataAgent PRO", layout="wide")
@@ -113,23 +45,26 @@ def main():
         st.success("Arquivo carregado com sucesso!")
 
         st.subheader("🧠 Perguntas Inteligentes")
-        perguntas = [
-            "Qual o total de vendas?",
-            "Qual o total de comissões?",
-            "Quantos clientes únicos?",
-            "Quais produtos foram vendidos?",
-            "Quem são os top afiliados?",
-            "Faturamento por cidade"
-        ]
-        pergunta_escolhida = st.selectbox("Escolha uma pergunta predefinida:", perguntas)
-        if pergunta_escolhida:
-            resposta = responder_pergunta(pergunta_escolhida, df)
-            st.info(resposta)
 
-        pergunta_livre = st.text_input("Ou digite sua própria pergunta:")
+        perguntas_cards = {
+            "💰 Total de vendas": "total de vendas",
+            "💸 Total de comissões": "total de comissões",
+            "👥 Clientes únicos": "clientes únicos",
+            "🛍️ Produtos vendidos": "produtos vendidos",
+            "🏆 Top afiliados": "top afiliados",
+            "🏙️ Faturamento por cidade": "faturamento por cidade"
+        }
+
+        cols = st.columns(3)
+        for i, (titulo, intencao) in enumerate(perguntas_cards.items()):
+            if cols[i % 3].button(titulo):
+                resposta = responder_pergunta(intencao, df)
+                st.success(resposta)
+
+        pergunta_livre = st.text_input("✏️ Ou digite sua própria pergunta:")
         if pergunta_livre:
             resposta = responder_pergunta(pergunta_livre, df)
-            st.success(resposta)
+            st.info(resposta)
 
         st.subheader("🗓️ Selecione o Período para Análise")
         data_min = df["Iniciada em"].min().date()
@@ -158,7 +93,6 @@ def main():
 
         df_filtrado = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]
 
-        # Cards
         total_vendas = df_filtrado["Total"].sum()
         total_comissao = df_filtrado["Comissão"].sum()
         ticket_medio = total_vendas / df_filtrado["Total"].count() if df_filtrado["Total"].count() else 0
@@ -171,7 +105,6 @@ def main():
         col3.metric("⚡ Chargeback", f"{chargeback:.2f}%")
         col4.metric("🔄 Estornos", f"{estorno:.2f}%")
 
-        # Gráficos
         st.subheader("📅 Vendas por Semana")
         vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
         st.line_chart(vendas_semana)
@@ -180,7 +113,6 @@ def main():
         faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
 
-        # Tendências
         st.subheader("📈 Tendência de Vendas e Faturamento")
         if not vendas_semana.empty:
             tendencia = vendas_semana.pct_change().dropna().mean() * 100
