@@ -20,8 +20,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 # Funções auxiliares
 def formatar_reais(valor):
@@ -63,9 +61,42 @@ def calcular_chargeback(df):
     chargeback_rate = (len(chargebacks) / total_vendas) * 100 if total_vendas > 0 else 0
     return chargeback_rate
 
+def responder_pergunta(pergunta, df):
+    pergunta = pergunta.lower()
+
+    mapeamento = {
+        "total de vendas": ["total de vendas", "quanto vendi", "faturamento", "vendas totais"],
+        "total de comissões": ["comissões", "quanto de comissão", "valor de comissão"],
+        "clientes únicos": ["clientes únicos", "quantos clientes", "clientes diferentes"],
+        "produtos vendidos": ["produtos vendidos", "quais produtos", "lista de produtos"],
+        "top afiliados": ["top afiliados", "melhores afiliados", "quem vendeu mais"],
+        "faturamento por cidade": ["cidade faturamento", "vendas por cidade", "faturamento cidade"]
+    }
+
+    for intencao, variações in mapeamento.items():
+        for variacao in variações:
+            if variacao in pergunta:
+                if intencao == "total de vendas":
+                    return f"💰 Total de vendas: {formatar_reais(df['Total'].sum())}"
+                elif intencao == "total de comissões":
+                    return f"💸 Total de comissões: {formatar_reais(df['Comissão'].sum())}"
+                elif intencao == "clientes únicos":
+                    return f"👥 Clientes únicos: {df['Cliente (E-mail)'].nunique()}"
+                elif intencao == "produtos vendidos":
+                    produtos = df['Produto'].value_counts()
+                    return "🛍️ Produtos vendidos:\n" + "\n".join([f"{produto}: {quantidade}" for produto, quantidade in produtos.items()])
+                elif intencao == "top afiliados":
+                    afiliados = df['Afiliado (Nome)'].value_counts().head(5)
+                    return "🏆 Top afiliados:\n" + "\n".join([f"{afiliado}: {quantidade}" for afiliado, quantidade in afiliados.items()])
+                elif intencao == "faturamento por cidade":
+                    cidades = df.groupby('Cliente (Cidade)')['Total'].sum().sort_values(ascending=False)
+                    return "🏙️ Faturamento por cidade:\n" + "\n".join([f"{cidade}: {formatar_reais(valor)}" for cidade, valor in cidades.items()])
+
+    return "❓ Não entendi sua pergunta. Tente reformular."
+
 def main():
     st.set_page_config(page_title="SalesDataAgent PRO", layout="wide")
-    st.title("🧪 SalesDataAgent PRO")
+    st.title("🧪 SalesDataAgent TURBO")
 
     uploaded_file = st.file_uploader("📎 Faça upload do seu arquivo CSV", type=["csv"])
 
@@ -81,57 +112,53 @@ def main():
 
         st.success("Arquivo carregado com sucesso!")
 
-        st.sidebar.header("🔍 Filtros")
-        data_min = df["Iniciada em"].min()
-        data_max = df["Iniciada em"].max()
+        st.subheader("🧠 Perguntas Inteligentes")
+        perguntas = [
+            "Qual o total de vendas?",
+            "Qual o total de comissões?",
+            "Quantos clientes únicos?",
+            "Quais produtos foram vendidos?",
+            "Quem são os top afiliados?",
+            "Faturamento por cidade"
+        ]
+        pergunta_escolhida = st.selectbox("Escolha uma pergunta predefinida:", perguntas)
+        if pergunta_escolhida:
+            resposta = responder_pergunta(pergunta_escolhida, df)
+            st.info(resposta)
 
-        periodo_opcao = st.sidebar.selectbox("Selecionar período:", ("Personalizado", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses"))
+        pergunta_livre = st.text_input("Ou digite sua própria pergunta:")
+        if pergunta_livre:
+            resposta = responder_pergunta(pergunta_livre, df)
+            st.success(resposta)
 
-        if periodo_opcao == "Hoje":
-            data_inicio = datetime.today().date()
-            data_fim = datetime.today().date()
-            comparativo_inicio = (datetime.today() - timedelta(days=1)).date()
-            comparativo_fim = (datetime.today() - timedelta(days=1)).date()
+        st.subheader("🗓️ Selecione o Período para Análise")
+        data_min = df["Iniciada em"].min().date()
+        data_max = df["Iniciada em"].max().date()
+
+        opcoes_periodo = ["Todo o Período", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses", "Personalizado"]
+        periodo_opcao = st.selectbox("Período:", opcoes_periodo)
+
+        if periodo_opcao == "Todo o Período":
+            data_inicio, data_fim = data_min, data_max
+        elif periodo_opcao == "Hoje":
+            data_inicio = data_fim = datetime.today().date()
         elif periodo_opcao == "Ontem":
-            data_inicio = (datetime.today() - timedelta(days=1)).date()
-            data_fim = (datetime.today() - timedelta(days=1)).date()
-            comparativo_inicio = (datetime.today() - timedelta(days=2)).date()
-            comparativo_fim = (datetime.today() - timedelta(days=2)).date()
+            data_inicio = data_fim = datetime.today().date() - timedelta(days=1)
         elif periodo_opcao == "Últimos 7 dias":
             data_fim = datetime.today().date()
-            data_inicio = (data_fim - timedelta(days=6))
-            comparativo_fim = (data_inicio - timedelta(days=1))
-            comparativo_inicio = (comparativo_fim - timedelta(days=6))
+            data_inicio = data_fim - timedelta(days=6)
         elif periodo_opcao == "Últimos 30 dias":
             data_fim = datetime.today().date()
-            data_inicio = (data_fim - timedelta(days=29))
-            comparativo_fim = (data_inicio - timedelta(days=1))
-            comparativo_inicio = (comparativo_fim - timedelta(days=29))
+            data_inicio = data_fim - timedelta(days=29)
         elif periodo_opcao == "Últimos 12 meses":
             data_fim = datetime.today().date()
-            data_inicio = (data_fim - timedelta(days=365))
-            comparativo_fim = (data_inicio - timedelta(days=1))
-            comparativo_inicio = (comparativo_fim - timedelta(days=365))
+            data_inicio = data_fim - timedelta(days=365)
         else:
-            data_inicio, data_fim = st.sidebar.date_input("Período de vendas", [data_min, data_max], min_value=data_min, max_value=data_max)
-            comparativo_inicio = data_inicio
-            comparativo_fim = data_fim
-
-        afiliado = st.sidebar.selectbox("Afiliado", ["Todos"] + sorted(df["Afiliado (Nome)"].dropna().unique().tolist()))
-        cidade = st.sidebar.selectbox("Cidade", ["Todos"] + sorted(df["Cliente (Cidade)"].dropna().unique().tolist()))
-        status_venda = st.sidebar.selectbox("Status da Venda", ["Todos"] + sorted(df["Status"].dropna().unique().tolist()))
-        metodo_pagamento = st.sidebar.selectbox("Método de Pagamento", ["Todos"] + sorted(df["Método de Pagamento"].dropna().unique().tolist()))
+            data_inicio, data_fim = st.date_input("Selecione o intervalo:", [data_min, data_max])
 
         df_filtrado = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]
-        if afiliado != "Todos":
-            df_filtrado = df_filtrado[df_filtrado["Afiliado (Nome)"] == afiliado]
-        if cidade != "Todos":
-            df_filtrado = df_filtrado[df_filtrado["Cliente (Cidade)"] == cidade]
-        if status_venda != "Todos":
-            df_filtrado = df_filtrado[df_filtrado["Status"] == status_venda]
-        if metodo_pagamento != "Todos":
-            df_filtrado = df_filtrado[df_filtrado["Método de Pagamento"] == metodo_pagamento]
 
+        # Cards
         total_vendas = df_filtrado["Total"].sum()
         total_comissao = df_filtrado["Comissão"].sum()
         ticket_medio = total_vendas / df_filtrado["Total"].count() if df_filtrado["Total"].count() else 0
@@ -144,6 +171,7 @@ def main():
         col3.metric("⚡ Chargeback", f"{chargeback:.2f}%")
         col4.metric("🔄 Estornos", f"{estorno:.2f}%")
 
+        # Gráficos
         st.subheader("📅 Vendas por Semana")
         vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
         st.line_chart(vendas_semana)
@@ -152,49 +180,14 @@ def main():
         faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
 
-        st.subheader("🔎 Análise Automática de Tendências")
-
-        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
-            tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
-            if np.isfinite(tendencia_vendas):
-                if tendencia_vendas > 0:
-                    st.success(f"📈 As vendas estão crescendo em média {tendencia_vendas:.2f}% por semana.")
-                elif tendencia_vendas < 0:
-                    st.error(f"📉 As vendas estão caindo em média {abs(tendencia_vendas):.2f}% por semana.")
-                else:
-                    st.info("➖ As vendas estão estáveis nas últimas semanas.")
+        # Tendências
+        st.subheader("📈 Tendência de Vendas e Faturamento")
+        if not vendas_semana.empty:
+            tendencia = vendas_semana.pct_change().dropna().mean() * 100
+            if tendencia > 0:
+                st.success(f"📈 Vendas subindo {tendencia:.2f}% por semana.")
             else:
-                st.info("➖ Dados insuficientes para analisar tendência de vendas.")
-        else:
-            st.info("➖ Dados insuficientes para analisar tendência de vendas.")
-
-        if not faturamento_mes.empty and faturamento_mes.shape[0] > 1:
-            tendencia_ticket = faturamento_mes.pct_change().dropna().mean() * 100
-            if np.isfinite(tendencia_ticket):
-                if tendencia_ticket > 0:
-                    st.success(f"📈 O faturamento mensal aumentou em média {tendencia_ticket:.2f}%.")
-                elif tendencia_ticket < 0:
-                    st.error(f"📉 O faturamento mensal caiu em média {abs(tendencia_ticket):.2f}%.")
-                else:
-                    st.info("➖ O faturamento mensal está estável.")
-            else:
-                st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
-        else:
-            st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
-
-        if chargeback > 5:
-            st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
-        if estorno > 5:
-            st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
-
-        st.subheader("🔄 Comparativo entre Períodos")
-
-        vendas_p1 = df[(df["Iniciada em"].dt.date >= comparativo_inicio) & (df["Iniciada em"].dt.date <= comparativo_fim)]["Total"].sum()
-        vendas_p2 = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]["Total"].sum()
-
-        st.metric("Comparativo de Faturamento", f"{formatar_reais(vendas_p2)}", delta=f"{((vendas_p2-vendas_p1)/vendas_p1*100):.2f}%" if vendas_p1 else "0%")
-
-        st.download_button("📂 Baixar Relatório Filtrado", df_filtrado.to_csv(index=False).encode('utf-8'), "relatorio_pro.csv", "text/csv")
+                st.error(f"📉 Vendas caindo {abs(tendencia):.2f}% por semana.")
 
 if __name__ == "__main__":
     main()
