@@ -7,10 +7,21 @@
 # Comparativo de períodos
 # Baixar relatório filtrado em CSV
 
+# versão incrementada com 
+# Perguntas predefinidas e campo de texto no início
+# Cards de Faturamento, Comissão, Chargeback e Estornos
+# Filtros adicionais: Afiliado, Cidade, Status da Venda, Método de Pagamento
+# Gráficos semanais e mensais
+# Análise Automática de Tendências
+# Comparativo de períodos
+# Baixar relatório filtrado em CSV
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 # Funções auxiliares
 def formatar_reais(valor):
@@ -70,35 +81,17 @@ def main():
 
         st.success("Arquivo carregado com sucesso!")
 
-        st.subheader("🧠 Perguntas Predefinidas")
-        perguntas = [
-            "Qual o total de vendas?",
-            "Qual o total de comissões?",
-            "Quantos clientes únicos?",
-            "Quais produtos foram vendidos?",
-            "Quem são os top afiliados?",
-            "Faturamento por cidade"
-        ]
-        st.write("Perguntas disponíveis:")
-        for pergunta in perguntas:
-            st.write(f"- {pergunta}")
+        st.sidebar.header("🔍 Filtros")
+        data_min = df["Iniciada em"].min()
+        data_max = df["Iniciada em"].max()
 
-        st.subheader("🗓️ Selecione o Período para Análise")
+        periodo_opcao = st.sidebar.selectbox("Selecionar período:", ("Personalizado", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses"))
 
-        opcoes_periodo = ["Todo o Período", "Hoje", "Ontem", "Últimos 7 dias", "Últimos 30 dias", "Últimos 12 meses", "Personalizado"]
-        periodo_opcao = st.selectbox("Selecionar período:", opcoes_periodo)
-
-        data_min = df["Iniciada em"].min().date()
-        data_max = df["Iniciada em"].max().date()
-
-        if periodo_opcao == "Todo o Período":
-            data_inicio, data_fim = data_min, data_max
-            comparativo_inicio, comparativo_fim = data_min, data_max
-        elif periodo_opcao == "Hoje":
+        if periodo_opcao == "Hoje":
             data_inicio = datetime.today().date()
             data_fim = datetime.today().date()
-            comparativo_inicio = data_inicio - timedelta(days=1)
-            comparativo_fim = data_fim - timedelta(days=1)
+            comparativo_inicio = (datetime.today() - timedelta(days=1)).date()
+            comparativo_fim = (datetime.today() - timedelta(days=1)).date()
         elif periodo_opcao == "Ontem":
             data_inicio = (datetime.today() - timedelta(days=1)).date()
             data_fim = (datetime.today() - timedelta(days=1)).date()
@@ -106,31 +99,30 @@ def main():
             comparativo_fim = (datetime.today() - timedelta(days=2)).date()
         elif periodo_opcao == "Últimos 7 dias":
             data_fim = datetime.today().date()
-            data_inicio = data_fim - timedelta(days=6)
-            comparativo_fim = data_inicio - timedelta(days=1)
-            comparativo_inicio = comparativo_fim - timedelta(days=6)
+            data_inicio = (data_fim - timedelta(days=6))
+            comparativo_fim = (data_inicio - timedelta(days=1))
+            comparativo_inicio = (comparativo_fim - timedelta(days=6))
         elif periodo_opcao == "Últimos 30 dias":
             data_fim = datetime.today().date()
-            data_inicio = data_fim - timedelta(days=29)
-            comparativo_fim = data_inicio - timedelta(days=1)
-            comparativo_inicio = comparativo_fim - timedelta(days=29)
+            data_inicio = (data_fim - timedelta(days=29))
+            comparativo_fim = (data_inicio - timedelta(days=1))
+            comparativo_inicio = (comparativo_fim - timedelta(days=29))
         elif periodo_opcao == "Últimos 12 meses":
             data_fim = datetime.today().date()
-            data_inicio = data_fim - timedelta(days=365)
-            comparativo_fim = data_inicio - timedelta(days=1)
-            comparativo_inicio = comparativo_fim - timedelta(days=365)
+            data_inicio = (data_fim - timedelta(days=365))
+            comparativo_fim = (data_inicio - timedelta(days=1))
+            comparativo_inicio = (comparativo_fim - timedelta(days=365))
         else:
-            data_inicio, data_fim = st.date_input("Selecione o intervalo de datas:", [data_min, data_max])
-            comparativo_inicio, comparativo_fim = data_inicio, data_fim
+            data_inicio, data_fim = st.sidebar.date_input("Período de vendas", [data_min, data_max], min_value=data_min, max_value=data_max)
+            comparativo_inicio = data_inicio
+            comparativo_fim = data_fim
 
-        st.sidebar.header("🔍 Filtros Adicionais")
         afiliado = st.sidebar.selectbox("Afiliado", ["Todos"] + sorted(df["Afiliado (Nome)"].dropna().unique().tolist()))
         cidade = st.sidebar.selectbox("Cidade", ["Todos"] + sorted(df["Cliente (Cidade)"].dropna().unique().tolist()))
         status_venda = st.sidebar.selectbox("Status da Venda", ["Todos"] + sorted(df["Status"].dropna().unique().tolist()))
         metodo_pagamento = st.sidebar.selectbox("Método de Pagamento", ["Todos"] + sorted(df["Método de Pagamento"].dropna().unique().tolist()))
 
         df_filtrado = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]
-
         if afiliado != "Todos":
             df_filtrado = df_filtrado[df_filtrado["Afiliado (Nome)"] == afiliado]
         if cidade != "Todos":
@@ -139,33 +131,6 @@ def main():
             df_filtrado = df_filtrado[df_filtrado["Status"] == status_venda]
         if metodo_pagamento != "Todos":
             df_filtrado = df_filtrado[df_filtrado["Método de Pagamento"] == metodo_pagamento]
-
-        st.subheader("📅 Vendas por Semana")
-        vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
-
-        st.subheader("📊 Faturamento Mensal")
-        faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
-
-        st.subheader("🔎 Análise Automática de Tendências")
-        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
-            tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
-            if np.isfinite(tendencia_vendas):
-                if tendencia_vendas > 0:
-                    st.success(f"📈 As vendas estão crescendo em média {tendencia_vendas:.2f}% por semana.")
-                elif tendencia_vendas < 0:
-                    st.error(f"📉 As vendas estão caindo em média {abs(tendencia_vendas):.2f}% por semana.")
-                else:
-                    st.info("➖ As vendas estão estáveis nas últimas semanas.")
-
-        if not faturamento_mes.empty and faturamento_mes.shape[0] > 1:
-            tendencia_ticket = faturamento_mes.pct_change().dropna().mean() * 100
-            if np.isfinite(tendencia_ticket):
-                if tendencia_ticket > 0:
-                    st.success(f"📈 O faturamento mensal aumentou em média {tendencia_ticket:.2f}%.")
-                elif tendencia_ticket < 0:
-                    st.error(f"📉 O faturamento mensal caiu em média {abs(tendencia_ticket):.2f}%.")
-                else:
-                    st.info("➖ O faturamento mensal está estável.")
 
         total_vendas = df_filtrado["Total"].sum()
         total_comissao = df_filtrado["Comissão"].sum()
@@ -179,10 +144,51 @@ def main():
         col3.metric("⚡ Chargeback", f"{chargeback:.2f}%")
         col4.metric("🔄 Estornos", f"{estorno:.2f}%")
 
+        st.subheader("📅 Vendas por Semana")
+        vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
         st.line_chart(vendas_semana)
+
+        st.subheader("📊 Faturamento Mensal")
+        faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
 
+        st.subheader("🔎 Análise Automática de Tendências")
+
+        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
+            tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
+            if np.isfinite(tendencia_vendas):
+                if tendencia_vendas > 0:
+                    st.success(f"📈 As vendas estão crescendo em média {tendencia_vendas:.2f}% por semana.")
+                elif tendencia_vendas < 0:
+                    st.error(f"📉 As vendas estão caindo em média {abs(tendencia_vendas):.2f}% por semana.")
+                else:
+                    st.info("➖ As vendas estão estáveis nas últimas semanas.")
+            else:
+                st.info("➖ Dados insuficientes para analisar tendência de vendas.")
+        else:
+            st.info("➖ Dados insuficientes para analisar tendência de vendas.")
+
+        if not faturamento_mes.empty and faturamento_mes.shape[0] > 1:
+            tendencia_ticket = faturamento_mes.pct_change().dropna().mean() * 100
+            if np.isfinite(tendencia_ticket):
+                if tendencia_ticket > 0:
+                    st.success(f"📈 O faturamento mensal aumentou em média {tendencia_ticket:.2f}%.")
+                elif tendencia_ticket < 0:
+                    st.error(f"📉 O faturamento mensal caiu em média {abs(tendencia_ticket):.2f}%.")
+                else:
+                    st.info("➖ O faturamento mensal está estável.")
+            else:
+                st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
+        else:
+            st.info("➖ Dados insuficientes para analisar tendência de faturamento.")
+
+        if chargeback > 5:
+            st.warning(f"⚡ Atenção: a taxa de chargeback está alta ({chargeback:.2f}%).")
+        if estorno > 5:
+            st.warning(f"🔄 Atenção: a taxa de estornos está alta ({estorno:.2f}%).")
+
         st.subheader("🔄 Comparativo entre Períodos")
+
         vendas_p1 = df[(df["Iniciada em"].dt.date >= comparativo_inicio) & (df["Iniciada em"].dt.date <= comparativo_fim)]["Total"].sum()
         vendas_p2 = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]["Total"].sum()
 
