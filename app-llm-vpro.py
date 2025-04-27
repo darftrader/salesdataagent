@@ -178,12 +178,20 @@ def main():
 
         # Tendência de crescimento ou queda
         st.subheader("📈 Tendência de Vendas e Faturamento")
-        if not vendas_semana.empty:
+        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
             tendencia = vendas_semana.pct_change().dropna().mean() * 100
-            if tendencia > 0:
-                st.success(f"📈 Vendas subindo {tendencia:.2f}% por semana.")
+            if np.isfinite(tendencia):
+                if tendencia > 0:
+                    st.success(f"📈 Vendas subindo {tendencia:.2f}% por semana.")
+                elif tendencia < 0:
+                    st.error(f"📉 Vendas caindo {abs(tendencia):.2f}% por semana.")
+                else:
+                    st.info("➖ Vendas estáveis nas últimas semanas.")
             else:
-                st.error(f"📉 Vendas caindo {abs(tendencia):.2f}% por semana.")
+                st.info("➖ Dados insuficientes para calcular a tendência de vendas.")
+        else:
+            st.info("➖ Dados insuficientes para calcular a tendência de vendas.")
+
 
 if __name__ == "__main__":
     main()
