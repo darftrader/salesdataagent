@@ -13,7 +13,6 @@ import numpy as np
 from datetime import datetime, timedelta
 
 # Funções auxiliares
-
 def formatar_reais(valor):
     try:
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -55,7 +54,6 @@ def calcular_chargeback(df):
 
 def responder_pergunta(pergunta, df):
     pergunta = pergunta.lower()
-
     mapeamento = {
         "total de vendas": ["total de vendas", "quanto vendi", "faturamento", "vendas totais"],
         "total de comissões": ["comissões", "quanto de comissão", "valor de comissão"],
@@ -105,28 +103,6 @@ def main():
 
         st.success("Arquivo carregado com sucesso!")
 
-        st.subheader("🧠 Perguntas Inteligentes")
-
-        perguntas_cards = {
-            "💰 Total de vendas": "total de vendas",
-            "💸 Total de comissões": "total de comissões",
-            "👥 Clientes únicos": "clientes únicos",
-            "🛍️ Produtos vendidos": "produtos vendidos",
-            "🏆 Top afiliados": "top afiliados",
-            "🏙️ Faturamento por cidade": "faturamento por cidade"
-        }
-
-        cols = st.columns(3)
-        for i, (titulo, intencao) in enumerate(perguntas_cards.items()):
-            if cols[i % 3].button(titulo):
-                resposta = responder_pergunta(intencao, df_filtrado)  # usa df_filtrado
-                st.success(resposta)
-
-        pergunta_livre = st.text_input("✏️ Ou digite sua própria pergunta:")
-        if pergunta_livre:
-            resposta = responder_pergunta(pergunta_livre, df_filtrado)  # usa df_filtrado
-            st.info(resposta)
-
         st.subheader("🗓️ Selecione o Período para Análise")
         data_min = df["Iniciada em"].min().date()
         data_max = df["Iniciada em"].max().date()
@@ -154,12 +130,71 @@ def main():
 
         df_filtrado = df[(df["Iniciada em"].dt.date >= data_inicio) & (df["Iniciada em"].dt.date <= data_fim)]
 
+        st.subheader("📈 Análise de Tendências e Alertas")
+
+        vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
+        faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
+
+        # Tendência de vendas
+        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
+            tendencia_vendas = vendas_semana.pct_change().dropna().mean() * 100
+            if np.isfinite(tendencia_vendas):
+                if tendencia_vendas > 0:
+                    st.success(f"📈 Vendas subindo {tendencia_vendas:.2f}% por semana.")
+                elif tendencia_vendas < 0:
+                    st.error(f"📉 Vendas caindo {abs(tendencia_vendas):.2f}% por semana.")
+                else:
+                    st.info("➖ Vendas estáveis nas últimas semanas.")
+            else:
+                st.info("➖ Dados insuficientes para calcular a tendência de vendas.")
+
+        # Tendência de faturamento
+        if not faturamento_mes.empty and faturamento_mes.shape[0] > 1:
+            tendencia_faturamento = faturamento_mes.pct_change().dropna().mean() * 100
+            if np.isfinite(tendencia_faturamento):
+                if tendencia_faturamento > 0:
+                    st.success(f"📈 Faturamento subindo {tendencia_faturamento:.2f}% ao mês.")
+                elif tendencia_faturamento < 0:
+                    st.error(f"📉 Faturamento caindo {abs(tendencia_faturamento):.2f}% ao mês.")
+                else:
+                    st.info("➖ Faturamento estável nos últimos meses.")
+            else:
+                st.info("➖ Dados insuficientes para calcular a tendência de faturamento.")
+
+        # Cálculo de Chargeback e Estorno
+        chargeback = calcular_chargeback(df_filtrado)
+        estorno = calcular_estorno(df_filtrado)
+
+        if chargeback > 5:
+            st.warning(f"⚡ Atenção: Chargeback elevado ({chargeback:.2f}%).")
+        if estorno > 5:
+            st.warning(f"🔄 Atenção: Estornos elevados ({estorno:.2f}%).")
+
+        st.subheader("🧠 Perguntas Inteligentes")
+
+        perguntas_cards = {
+            "💰 Total de vendas": "total de vendas",
+            "💸 Total de comissões": "total de comissões",
+            "👥 Clientes únicos": "clientes únicos",
+            "🛍️ Produtos vendidos": "produtos vendidos",
+            "🏆 Top afiliados": "top afiliados",
+            "🏙️ Faturamento por cidade": "faturamento por cidade"
+        }
+
+        cols = st.columns(3)
+        for i, (titulo, intencao) in enumerate(perguntas_cards.items()):
+            if cols[i % 3].button(titulo):
+                resposta = responder_pergunta(intencao, df_filtrado)
+                st.success(resposta)
+
+        pergunta_livre = st.text_input("✏️ Ou digite sua própria pergunta:")
+        if pergunta_livre:
+            resposta = responder_pergunta(pergunta_livre, df_filtrado)
+            st.info(resposta)
+
         # Cards principais
         total_vendas = df_filtrado["Total"].sum()
         total_comissao = df_filtrado["Comissão"].sum()
-        ticket_medio = total_vendas / df_filtrado["Total"].count() if df_filtrado["Total"].count() else 0
-        chargeback = calcular_chargeback(df_filtrado)
-        estorno = calcular_estorno(df_filtrado)
 
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("💰 Faturamento", formatar_reais(total_vendas))
@@ -169,29 +204,10 @@ def main():
 
         # Gráficos
         st.subheader("📅 Vendas por Semana")
-        vendas_semana = df_filtrado.resample('W-Mon', on="Iniciada em")["Total"].sum()
         st.line_chart(vendas_semana)
 
         st.subheader("📊 Faturamento Mensal")
-        faturamento_mes = df_filtrado.resample('M', on="Iniciada em")["Total"].sum()
         st.bar_chart(faturamento_mes)
-
-        # Tendência de crescimento ou queda
-        st.subheader("📈 Tendência de Vendas e Faturamento")
-        if not vendas_semana.empty and vendas_semana.shape[0] > 1:
-            tendencia = vendas_semana.pct_change().dropna().mean() * 100
-            if np.isfinite(tendencia):
-                if tendencia > 0:
-                    st.success(f"📈 Vendas subindo {tendencia:.2f}% por semana.")
-                elif tendencia < 0:
-                    st.error(f"📉 Vendas caindo {abs(tendencia):.2f}% por semana.")
-                else:
-                    st.info("➖ Vendas estáveis nas últimas semanas.")
-            else:
-                st.info("➖ Dados insuficientes para calcular a tendência de vendas.")
-        else:
-            st.info("➖ Dados insuficientes para calcular a tendência de vendas.")
-
 
 if __name__ == "__main__":
     main()
